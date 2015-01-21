@@ -1,10 +1,14 @@
+import datetime
+import collections
+
+from django.utils.safestring import mark_safe
+from django.db.models import Count
+
 from smartmin.views import *
 from rapidsms.models import Backend
 from rapidsms_httprouter.models import Message
 from rapidsms_httprouter.router import get_router
-from django.utils.safestring import mark_safe
-from django.db.models import Count
-import datetime
+
 
 class MessageTesterForm(forms.Form):
     backend = forms.CharField(max_length=20, initial='tester')
@@ -45,48 +49,33 @@ class MessageCRUDL(SmartCRUDL):
     class Monthly(SmartListView):
         title = "Monthly Message Volume"
 
-        def build_monthly_counts(self, objects, **filters):
-            counts = objects.filter(**filters).order_by('date').extra({'month':"month(date)", 'year':"year(date)"}).values('month', 'year').annotate(created_on_count=Count('id'))
-            
-            for count in counts:
-                count['created'] = datetime.datetime(day=1, month=count['month'], year=count['year'])
-
-            return counts
-
         def get_context_data(self, **kwargs):
             context = super(MessageCRUDL.Monthly, self).get_context_data(**kwargs)
             
             # get our queryset
-            objects = self.derive_queryset().order_by('date')
+            queryset = self.derive_queryset()
 
-            # break it up by date counts
-            context['incoming_counts'] = self.build_monthly_counts(objects, direction='I')
-            context['outgoing_counts'] = self.build_monthly_counts(objects, direction='O')
+            counts = queryset.filter(direction__in=('I', 'O')).order_by('direction', 'date').extra(
+                {'month': "month(date)", 'year': "year(date)"}).values(
+                'direction', 'month', 'year').annotate(message_count=Count('id'))
 
-            # build our breakdown
-            month = objects[0].date.month
-            year = objects[0].date.year
+            # split incoming and outgoing list is ordered and balanced so
+            # we just blindly cut in the middle
+            the_middle = len(counts) / 2
+            incoming_counts = counts[:the_middle]
+            outgoing_counts = counts[the_middle:]
 
-            start = datetime.datetime(day=1, month=month, year=year)
-            today = datetime.datetime.now()
-            
-            counts = []
-            while start < today:
-                if month == 12: 
-                    month = 1; year += 1
-                else:
-                    month += 1
+            # then we zip through both lists to create a new list with totals
+            total_counts = []
+            for ic, oc in zip(incoming_counts, outgoing_counts):
+                total_counts.append({
+                    'created': datetime.datetime(day=1, month=ic['month'], year=ic['year']),
+                    'incoming': ic['message_count'],
+                    'outgoing': oc['message_count'],
+                    'total': ic['message_count'] + oc['message_count']
+                })
 
-                end = datetime.datetime(day=1, month=month, year=year)
-
-                incoming_count = objects.filter(date__gte=start, date__lt=end, direction='I').count()
-                outgoing_count = objects.filter(date__gte=start, date__lt=end, direction='O').count()
-                total = incoming_count + outgoing_count
-
-                counts.append(dict(start=start, incoming=incoming_count, outgoing=outgoing_count, total=total))
-                start = end
-
-            context['counts'] = counts
+            context['counts'] = total_counts
 
             return context
 
