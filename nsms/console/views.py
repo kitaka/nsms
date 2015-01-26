@@ -1,5 +1,5 @@
 import datetime
-import collections
+import itertools
 
 from django.utils.safestring import mark_safe
 from django.db.models import Count
@@ -55,27 +55,40 @@ class MessageCRUDL(SmartCRUDL):
             # get our queryset
             queryset = self.derive_queryset()
 
+            backend_id = context['backend_id'] = int(self.request.REQUEST.get('backend_id', 0))
+            search = context['search'] = self.request.REQUEST.get('search', '')
+
+            if backend_id:
+                queryset = queryset.filter(connection__backend__id=backend_id)
+
+            if search:
+                print 'yeah'
+                queryset = queryset.filter(
+                    Q(text__search=search) | Q(connection__identity__startswith=search))
+
             counts = queryset.filter(direction__in=('I', 'O')).order_by('direction', 'date').extra(
                 {'month': "month(date)", 'year': "year(date)"}).values(
                 'direction', 'month', 'year').annotate(message_count=Count('id'))
 
-            # split incoming and outgoing list is ordered and balanced so
-            # we just blindly cut in the middle
-            the_middle = len(counts) / 2
-            incoming_counts = counts[:the_middle]
-            outgoing_counts = counts[the_middle:]
+            # create iterator that returns incoming/outgoing counts per month,
+            # or if one of both doesn't exist an empty fillvalue
+            iter = itertools.izip_longest(
+                filter(lambda x: x['direction'] == 'I', counts),
+                filter(lambda x: x['direction'] == 'O', counts),
+                fillvalue={'message_count': 0})
 
-            # then we zip through both lists to create a new list with totals
             total_counts = []
-            for ic, oc in zip(incoming_counts, outgoing_counts):
+            for ic, oc in iter:
+                ref = ic if 'month' in ic else oc
                 total_counts.append({
-                    'created': datetime.datetime(day=1, month=ic['month'], year=ic['year']),
+                    'created': datetime.datetime(day=1, month=ref['month'], year=ref['year']),
                     'incoming': ic['message_count'],
                     'outgoing': oc['message_count'],
                     'total': ic['message_count'] + oc['message_count']
                 })
 
             context['counts'] = total_counts
+            context['backends'] = Backend.objects.all()
 
             return context
 
