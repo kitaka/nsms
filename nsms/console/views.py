@@ -147,10 +147,10 @@ class MessageCRUDL(SmartCRUDL):
 
             context['backends'] = Backend.objects.all()
 
-            context['backend_id'] = int(self.request.REQUEST.get('backend_id', 0))
+            context['backend_id'] = int(self.request.GET.get('backend_id', 0))
 
             tester_backend = 'tester'
-            backend_id = int(self.request.REQUEST.get('backend_id', 0))
+            backend_id = int(self.request.GET.get('backend_id', 0))
             if backend_id:
                 backend = Backend.objects.get(id=backend_id)
                 if backend.name.find('tester') < 0:
@@ -158,7 +158,7 @@ class MessageCRUDL(SmartCRUDL):
                 else:
                     tester_backend = backend.name
 
-            context['backend_id'] = int(self.request.REQUEST.get('backend_id', 0))
+            context['backend_id'] = int(self.request.GET.get('backend_id', 0))
             context['tester_backend'] = tester_backend
 
             if self.request.method == 'POST':
