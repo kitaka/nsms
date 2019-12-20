@@ -125,7 +125,10 @@ class MessageCRUDL(SmartCRUDL):
             return self.get(*args, **kwargs)
 
         def build_daily_counts(self, objects, **filters):
-            counts = objects.filter(**filters).order_by('date').extra({'created':"date(date)"}).values('created').annotate(created_on_count=Count('id'))
+            # https://docs.djangoproject.com/en/dev/topics/db/aggregation/#interaction-with-default-ordering-or-order-by
+            counts = objects.filter(**filters).order_by('date').extra(
+                {'created':"date(date)"}).values('created').annotate(
+                created_on_count=Count('id')).order_by()
             
             for count in counts:
                 created_str = count['created']
