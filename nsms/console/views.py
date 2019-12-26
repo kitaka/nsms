@@ -13,7 +13,8 @@ from rapidsms_httprouter.router import get_router
 class MessageTesterForm(forms.Form):
     backend = forms.CharField(max_length=20, initial='tester')
     sender = forms.CharField(max_length=20, initial="12065551212")
-    text = forms.CharField(max_length=160, label="Message", widget=forms.TextInput(attrs={'size':'60'}))
+    text = forms.CharField(max_length=160, label="Message", widget=forms.TextInput(attrs={'size': '60'}))
+
 
 class MessageCRUDL(SmartCRUDL):
     actions = ('list', 'csv', 'monthly', 'status')
@@ -51,7 +52,7 @@ class MessageCRUDL(SmartCRUDL):
 
         def get_context_data(self, **kwargs):
             context = super(MessageCRUDL.Monthly, self).get_context_data(**kwargs)
-            
+
             # get our queryset
             queryset = self.derive_queryset()
 
@@ -62,7 +63,6 @@ class MessageCRUDL(SmartCRUDL):
                 queryset = queryset.filter(connection__backend__id=backend_id)
 
             if search:
-                print 'yeah'
                 queryset = queryset.filter(
                     Q(text__search=search) | Q(connection__identity__startswith=search))
 
@@ -98,7 +98,7 @@ class MessageCRUDL(SmartCRUDL):
         fields = ('direction', 'number', 'text', 'date')
         default_order = '-date'
         search_fields = ('text__icontains', 'connection__identity__icontains')
-        field_config = { 'direction': dict(label=" ") }
+        field_config = {'direction': dict(label=" ")}
 
         refresh = 5000
 
@@ -117,29 +117,30 @@ class MessageCRUDL(SmartCRUDL):
             if form.is_valid():
                 message = get_router().handle_incoming(form.cleaned_data.get('backend', 'tester'),
                                                        form.cleaned_data['sender'],
-                                                       form.cleaned_data['text'])                
+                                                       form.cleaned_data['text'])
 
                 # and off we go
-                return HttpResponseRedirect(reverse('console.message_list') + "?backend_id=%d" % message.connection.backend.id)
+                return HttpResponseRedirect(
+                    reverse('console.message_list') + "?backend_id=%d" % message.connection.backend.id)
 
             return self.get(*args, **kwargs)
 
         def build_daily_counts(self, objects, **filters):
             # https://docs.djangoproject.com/en/dev/topics/db/aggregation/#interaction-with-default-ordering-or-order-by
             counts = objects.filter(**filters).order_by('date').extra(
-                {'created':"date(date)"}).values('created').annotate(
+                {'created': "date(date)"}).values('created').annotate(
                 created_on_count=Count('id')).order_by()
-            
+
             for count in counts:
                 created_str = count['created']
                 if not hasattr(created_str, 'year'):
                     count['created'] = datetime.datetime.strptime(created_str, "%Y-%m-%d")
 
             return counts
-        
+
         def get_context_data(self, **kwargs):
             context = super(MessageCRUDL.List, self).get_context_data(**kwargs)
-            
+
             # get our queryset
             objects = self.derive_queryset()
             one_month = datetime.datetime.now() - datetime.timedelta(days=30)
@@ -170,7 +171,7 @@ class MessageCRUDL(SmartCRUDL):
                 context['form'] = MessageTesterForm()
 
             return context
-        
+
         def get_number(self, obj):
             return obj.connection.identity
 
@@ -193,4 +194,4 @@ class MessageCRUDL(SmartCRUDL):
                     style = 'queued'
 
             return mark_safe('<div class="%s"> </div>' % style)
-                
+
