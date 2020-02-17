@@ -56,8 +56,8 @@ class MessageCRUDL(SmartCRUDL):
             # get our queryset
             queryset = self.derive_queryset()
 
-            backend_id = context['backend_id'] = int(self.request.REQUEST.get('backend_id', 0))
-            search = context['search'] = self.request.REQUEST.get('search', '')
+            backend_id = context['backend_id'] = int(self.request.GET.get('backend_id', 0))
+            search = context['search'] = self.request.GET.get('search', '')
 
             if backend_id:
                 queryset = queryset.filter(connection__backend__id=backend_id)
@@ -72,7 +72,7 @@ class MessageCRUDL(SmartCRUDL):
 
             # create iterator that returns incoming/outgoing counts per month,
             # or if one of both doesn't exist an empty fillvalue
-            iter = itertools.izip_longest(
+            iter = itertools.zip_longest(
                 filter(lambda x: x['direction'] == 'I', counts),
                 filter(lambda x: x['direction'] == 'O', counts),
                 fillvalue={'message_count': 0})
